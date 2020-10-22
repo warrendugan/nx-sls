@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { Component } from '@angular/core';
 
 @Component({
@@ -7,4 +8,10 @@ import { Component } from '@angular/core';
 })
 export class AppComponent {
   title = 'www';
+
+  constructor(private http: HttpClient) {
+    this.http.get('/api/hello-world').subscribe((result: any) => {
+      console.log(result);
+    });
+  }
 }

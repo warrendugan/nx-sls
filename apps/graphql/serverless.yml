@@ -1,0 +1,28 @@
+service: graphql
+frameworkVersion: ">=1.1.0 <2.0.0"
+plugins:
+  - serverless-offline
+custom:
+  stage: ${opt:stage, 'dev'}
+package:
+  individually: true
+  excludeDevDependencies: false
+  # path: dist/apps/graphql
+  custom:
+    enable_optimize:
+      local: false
+  include:
+    - src/handler.helloWorld
+provider:
+  name: aws
+  region: us-west-1
+  endpointType: PRIVATE
+  runtime: nodejs10.x
+  stage: ${self:custom.stage}
+functions:
+  hello-world:
+    handler: src/handler.helloWorld
+    events:
+      - http:
+          path: hello-world
+          method: get

@@ -15,7 +15,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "outputPath": "dist/apps/www",
+            "outputPath": "dist/apps/www/browser",
             "index": "apps/www/src/index.html",
             "main": "apps/www/src/main.ts",
             "polyfills": "apps/www/src/polyfills.ts",
@@ -59,7 +59,8 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "www:build"
+            "browserTarget": "www:build",
+            "proxyConfig": "apps/www/proxy.conf.json"
           },
           "configurations": {
             "production": {
@@ -79,7 +80,8 @@
             "tsConfig": [
               "apps/www/tsconfig.app.json",
               "apps/www/tsconfig.spec.json",
-              "apps/www/tsconfig.editor.json"
+              "apps/www/tsconfig.editor.json",
+              "apps/www/tsconfig.server.json"
             ],
             "exclude": ["**/node_modules/**", "!apps/www/**/*"]
           }
@@ -90,32 +92,265 @@
             "jestConfig": "apps/www/jest.config.js",
             "passWithNoTests": true
           }
-        }
-      }
-    },
-    "www-e2e": {
-      "root": "apps/www-e2e",
-      "sourceRoot": "apps/www-e2e/src",
-      "projectType": "application",
-      "architect": {
-        "e2e": {
-          "builder": "@nrwl/cypress:cypress",
+        },
+        "server": {
+          "builder": "@angular-devkit/build-angular:server",
           "options": {
-            "cypressConfig": "apps/www-e2e/cypress.json",
-            "tsConfig": "apps/www-e2e/tsconfig.e2e.json",
-            "devServerTarget": "www:serve"
+            "outputPath": "dist/apps/www/server",
+            "main": "apps/www/server.ts",
+            "tsConfig": "apps/www/tsconfig.server.json"
           },
           "configurations": {
             "production": {
-              "devServerTarget": "www:serve:production"
+              "outputHashing": "media",
+              "fileReplacements": [
+                {
+                  "replace": "apps/www/src/environments/environment.ts",
+                  "with": "apps/www/src/environments/environment.prod.ts"
+                }
+              ],
+              "sourceMap": false,
+              "optimization": true
             }
+          }
+        },
+        "serve-ssr": {
+          "builder": "@nguniversal/builders:ssr-dev-server",
+          "options": {
+            "browserTarget": "www:build",
+            "serverTarget": "www:server"
+          },
+          "configurations": {
+            "production": {
+              "browserTarget": "www:build:production",
+              "serverTarget": "www:server:production"
+            }
+          }
+        },
+        "prerender": {
+          "builder": "@nguniversal/builders:prerender",
+          "options": {
+            "browserTarget": "www:build:production",
+            "serverTarget": "www:server:production",
+            "routes": ["/"]
+          },
+          "configurations": {
+            "production": {}
+          }
+        },
+        "compile": {
+          "builder": "@flowaccount/nx-serverless:compile",
+          "options": {
+            "outputPath": "dist",
+            "package": "apps/www",
+            "serverlessConfig": "apps/www/serverless.yml",
+            "servicePath": "apps/www",
+            "tsConfig": "apps/www/tsconfig.serverless.json",
+            "provider": "aws",
+            "processEnvironmentFile": "env.json",
+            "skipClean": true
+          },
+          "configurations": {
+            "dev": {
+              "optimization": false,
+              "sourceMap": false,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                }
+              ]
+            },
+            "production": {
+              "optimization": true,
+              "sourceMap": false,
+              "extractCss": true,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "apps/www/environment.ts",
+                  "with": "apps/www/environment.prod.ts"
+                }
+              ]
+            }
+          }
+        },
+        "offline": {
+          "builder": "@flowaccount/nx-serverless:offline",
+          "options": {
+            "waitUntilTargets": ["www:build", "www:server"],
+            "buildTarget": "www:compile",
+            "config": "apps/www/serverless.yml",
+            "location": "dist/apps/www"
+          },
+          "configurations": {
+            "dev": {
+              "buildTarget": "www:compile:dev"
+            },
+            "production": {
+              "buildTarget": "www:compile:production"
+            }
+          }
+        },
+        "deploy": {
+          "builder": "@flowaccount/nx-serverless:deploy",
+          "options": {
+            "waitUntilTargets": [
+              "www:build:production",
+              "www:server:production"
+            ],
+            "buildTarget": "www:compile:production",
+            "config": "apps/www/serverless.yml",
+            "location": "dist/apps/www",
+            "package": "dist/apps/www"
+          }
+        },
+        "destroy": {
+          "builder": "@flowaccount/nx-serverless:destroy",
+          "options": {
+            "buildTarget": "www:compile:production",
+            "config": "apps/www/serverless.yml",
+            "location": "dist/apps/www",
+            "package": "dist/apps/www"
+          }
+        }
+      }
+    },
+    "graphql": {
+      "root": "apps/graphql",
+      "sourceRoot": "apps/graphql/src",
+      "projectType": "application",
+      "prefix": "graphql",
+      "schematics": {},
+      "architect": {
+        "build": {
+          "builder": "@flowaccount/nx-serverless:build",
+          "options": {
+            "outputPath": "dist/apps/graphql",
+            "package": "apps/graphql",
+            "serverlessConfig": "apps/graphql/serverless.yml",
+            "servicePath": "apps/graphql",
+            "tsConfig": "apps/graphql/tsconfig.app.json",
+            "provider": "aws",
+            "processEnvironmentFile": "env.json"
+          },
+          "configurations": {
+            "dev": {
+              "optimization": false,
+              "sourceMap": false,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                }
+              ]
+            },
+            "production": {
+              "optimization": true,
+              "sourceMap": false,
+              "extractCss": true,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "apps/graphql/environment.ts",
+                  "with": "apps/graphql/environment.prod.ts"
+                }
+              ]
+            }
+          }
+        },
+        "serve": {
+          "builder": "@flowaccount/nx-serverless:offline",
+          "options": {
+            "buildTarget": "graphql:build",
+            "config": "apps/graphql/serverless.yml",
+            "location": "dist/apps/graphql"
+          },
+          "configurations": {
+            "dev": {
+              "buildTarget": "graphql:build:dev"
+            },
+            "production": {
+              "buildTarget": "graphql:build:production"
+            }
+          }
+        },
+        "deploy": {
+          "builder": "@flowaccount/nx-serverless:deploy",
+          "options": {
+            "buildTarget": "graphql:build:production",
+            "config": "apps/graphql/serverless.yml",
+            "location": "dist/apps/graphql",
+            "package": "dist/apps/graphql"
+          }
+        },
+        "destroy": {
+          "builder": "@flowaccount/nx-serverless:destroy",
+          "options": {
+            "buildTarget": "graphql:build:production",
+            "config": "apps/graphql/serverless.yml",
+            "location": "dist/apps/graphql",
+            "package": "dist/apps/graphql"
           }
         },
         "lint": {
           "builder": "@angular-devkit/build-angular:tslint",
           "options": {
-            "tsConfig": ["apps/www-e2e/tsconfig.e2e.json"],
-            "exclude": ["**/node_modules/**", "!apps/www-e2e/**/*"]
+            "tsConfig": [
+              "apps/graphql/tsconfig.app.json",
+              "apps/graphql/tsconfig.spec.json"
+            ],
+            "exclude": ["**/node_modules/**", "!apps/graphql/**/*"]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "options": {
+            "jestConfig": "apps/graphql/jest.config.js",
+            "passWithNoTests": true
+          }
+        },
+        "sls": {
+          "builder": "@flowaccount/nx-serverless:sls",
+          "options": {
+            "waitUntilTargets": [],
+            "buildTarget": "graphql:build:production",
+            "config": "apps/graphql/serverless.yml",
+            "location": "dist/apps/graphql",
+            "package": "dist/apps/graphql",
+            "command": "package"
+          },
+          "configurations": {
+            "deploy-dev": {
+              "buildTarget": "graphql:build:dev",
+              "command": "deploy",
+              "stage": "dev"
+            },
+            "deploy-production": {
+              "buildTarget": "graphql:build:production",
+              "command": "deploy",
+              "stage": "prod"
+            }
           }
         }
       }
